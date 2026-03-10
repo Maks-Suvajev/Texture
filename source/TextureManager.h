@@ -16,38 +16,31 @@
 #include "TextureTypes.h"
 
 // Asset manager
-#include "GfxAssetRegistry.h"
+#include "AssetRegistry.h"
+
+#include "ResourceManager.h"
 
 namespace gfx 
 {
 
-class TextureManager
+class TextureManager : public ResourceManager<Texture>
 {
     public:
-        TextureManager(GfxAssetRegistry* assetsManager, QOpenGLExtraFunctions* openGLFunctions );
+        TextureManager(AssetRegistry* assetsManager, QOpenGLExtraFunctions* openGLFunctions );
+
+        void refreshElements() override;
         void registerTexture(const std::filesystem::path& texturePath);
         void registerAllTextures();
-        void loadTexture(std::string key);
-        void unloadTexture(std::string key);
-        void resetTexture(Texture* texture);
-        void deleteTexture(std::string key);
-        void loadAllTextures();
-        void refreshTextures();
-        void updateTexturePath(std::string path);
-        std::vector<std::string> loadActiveTextureKeys();
 
-        std::string extractTextureName(std::filesystem::path texturePath);
-        std::filesystem::path getCurrentWorkingDirectory();
+        void unloadTexture(std::string key);
+        void loadTexture(std::string key);
+        void resetTexture(Texture* texture);
+
         GLuint getTextureID(std::string key);
         void printAllTextures();
-        const std::unordered_map<std::string, std::unique_ptr<Texture>>& getMap();
 
     private:
-        std::unordered_map<std::string, std::unique_ptr<Texture>> m_textures;
-        GfxAssetRegistry*                                         m_assetsManager;
-        QOpenGLExtraFunctions*                                    m_openGLFunctions;
-
-
+        QOpenGLExtraFunctions* m_openGLFunctions;
 };
 
 

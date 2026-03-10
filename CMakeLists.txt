@@ -9,6 +9,7 @@ target_link_libraries(TextureLib
         Qt6::OpenGL
         TypeLib
         AssetsLib
+        ResourceManagersLib
 )
 
 target_include_directories(TextureLib 

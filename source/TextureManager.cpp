@@ -5,68 +5,29 @@
 
 namespace gfx {
 
-TextureManager::TextureManager(GfxAssetRegistry* assetsManager, QOpenGLExtraFunctions* openGLFunctions)
-    : m_openGLFunctions(openGLFunctions),
-      m_assetsManager(assetsManager)
+TextureManager::TextureManager(AssetRegistry* assetRegistry, QOpenGLExtraFunctions* openGLFunctions)
+    : ResourceManager<Texture>(assetRegistry, supportedTextureFileTypes),
+      m_openGLFunctions(openGLFunctions)
 {
     registerAllTextures();
 }
 
 void TextureManager::registerAllTextures()
 {
-    for (const auto& texturePath : m_assetsManager->getTexturePaths())
+    for (const auto& texturePath : m_assetRegistry->getAllFilesOfType(m_activeDirectory, m_supportedFileTypes))
     {
         registerTexture(texturePath);
     }
 }
 
-void TextureManager::loadAllTextures()
+void TextureManager::refreshElements()
 {
-    for (const auto& [key, texture] : m_textures)
-    {
-        loadTexture(key);
-    }
-}
-
-void TextureManager::updateTexturePath(std::string path)
-{
-    std::filesystem::path filePath(path);
-
-    m_assetsManager->updateTextureFolderPath(filePath);
-}
-
-std::filesystem::path TextureManager::getCurrentWorkingDirectory()
-{
-    return m_assetsManager->getTextureFolderPath();
-}
-
-
-// Used for cleaning out textures from the map if file is removed from folder
-void TextureManager::deleteTexture(std::string name)
-{
-    m_textures.erase(name);
-}
-
-std::vector<std::string> TextureManager::loadActiveTextureKeys()
-{
-    std::vector<std::string> keys;
-
-    for (const auto& [key, texture] : m_textures)
-    {
-        keys.push_back(key);
-    }
-
-    return keys;
-}
-
-void TextureManager::refreshTextures()
-{
-    std::vector<std::string> oldKeys = loadActiveTextureKeys();
+    std::vector<std::string> oldKeys = getKeys();
     std::vector<std::string> newKeys;
 
-    for (const auto& texturePath : m_assetsManager->getTexturePaths())
+    for (const auto& texturePath : m_assetRegistry->getAllFilesOfType(m_activeDirectory, m_supportedFileTypes))
     {
-        std::string name = extractTextureName(texturePath);
+        std::string name = texturePath.filename().string();
 
         auto iter = std::find(oldKeys.begin(), oldKeys.end(), name);
 
@@ -81,29 +42,18 @@ void TextureManager::refreshTextures()
         }
     }
 
-    for (const auto& name : oldKeys)
+    for (const auto& key : oldKeys)
     {
         // Keep old keys as long as the file still exists
-        if (!std::filesystem::exists(m_textures[name].get()->systemSourcePath))
+        if (!std::filesystem::exists(m_elements[key].get()->systemSourcePath))
         {
             #ifdef ENABLE_DEBUG_MESSAGES
-                std::cout << "ERROR::TextureManager::refreshTextures::Deleting key because it no longer exists: " << name << std::endl;
+                std::cout << "ERROR::TextureManager::refreshTextures::Deleting key because it no longer exists: " << key << std::endl;
             #endif
 
-            deleteTexture(name);
+            deleteElement(key);
         };
     }
-}
-
-const std::unordered_map<std::string, std::unique_ptr<Texture>>& TextureManager::getMap()
-{
-    return m_textures;
-}
-
-
-std::string TextureManager::extractTextureName(std::filesystem::path texturePath)
-{
-    return texturePath.filename().string();
 }
 
 void TextureManager::printAllTextures()
@@ -112,7 +62,7 @@ void TextureManager::printAllTextures()
 
     std::cout << "| ----- Printing currently available textures and their source paths ----- |" << std::endl;
 
-    for (const auto& [key, item] : m_textures)
+    for (const auto& [key, item] : m_elements)
     {
         std::cout << "----------------------------------------------------------------------------" << std::endl;
         std::cout << "Key: " << key << std::endl;
@@ -134,7 +84,7 @@ void TextureManager::registerTexture(const std::filesystem::path& texturePath)
 {
     const auto key = std::filesystem::canonical(texturePath).generic_string();
 
-    if (m_textures.contains(key))
+    if (m_elements.contains(key))
     {
         #ifdef ENABLE_DEBUG_MESSAGES
             std::cout << "ERROR::Texture already loaded with the key: " << texturePath.string() << std::endl;
@@ -145,8 +95,8 @@ void TextureManager::registerTexture(const std::filesystem::path& texturePath)
 
     Texture textureData{};
     textureData.systemSourcePath = std::filesystem::canonical(texturePath);
-    textureData.name             = extractTextureName(texturePath);
-    m_textures[key] = std::make_unique<Texture>(textureData);     
+    textureData.name             = texturePath.filename().string();
+    m_elements[key]              = std::make_unique<Texture>(textureData);     
 }
 
 
@@ -165,7 +115,7 @@ void TextureManager::resetTexture(Texture* texture)
 
 void TextureManager::unloadTexture(std::string key)
 {
-    if (!m_textures.contains(key))
+    if (!m_elements.contains(key))
     {
         #ifdef ENABLE_DEBUG_MESSAGES
             std::cout << "DEBUG::TextureManager::unloadTexture::Texture not found with the key: " << key << std::endl;
@@ -174,7 +124,7 @@ void TextureManager::unloadTexture(std::string key)
         return;
     }
 
-    Texture* texture = m_textures[key].get();
+    Texture* texture = m_elements[key].get();
     
     if (!texture->isLoaded)
     {
@@ -188,11 +138,9 @@ void TextureManager::unloadTexture(std::string key)
     resetTexture(texture);
 }
 
-
-// Using name as hash, user can load the same texture under different names if they want
 void TextureManager::loadTexture(std::string key)
 {
-    if (!m_textures.contains(key))
+    if (!m_elements.contains(key))
     {
         #ifdef ENABLE_DEBUG_MESSAGES
             std::cout << "DEBUG::TextureManager::loadTexture::Texture not found with the key: " << key << std::endl;
@@ -201,7 +149,7 @@ void TextureManager::loadTexture(std::string key)
         return;
     }
 
-    Texture* texture = m_textures[key].get();
+    Texture* texture = m_elements[key].get();
 
     if (texture->isLoaded)
     {
@@ -304,10 +252,10 @@ void TextureManager::loadTexture(std::string key)
 
 GLuint TextureManager::getTextureID(std::string key)
 {
-    auto it = m_textures.find(key);
+    auto it = m_elements.find(key);
 
     // Check if key exists, also check if unique_ptr is valid that it points to
-    if (it == m_textures.end() || !it->second) 
+    if (it == m_elements.end() || !it->second) 
     {
         #ifdef ENABLE_DEBUG_MESSAGES
             std::cout << "ERROR::Invalid key given: " << key << std::endl;
@@ -317,10 +265,12 @@ GLuint TextureManager::getTextureID(std::string key)
     }
 
     #ifdef ENABLE_DEBUG_MESSAGES
-        std::cout << "DEBUG::Key: " << key << " Texture ID Found: " << m_textures[key]->textureID << std::endl;
+        std::cout << "DEBUG::Key: " << key << " Texture ID Found: " << m_elements[key]->textureID << std::endl;
     #endif
 
-    return m_textures[key]->textureID;
+    return m_elements[key]->textureID;
 }
+
+
 
 };
