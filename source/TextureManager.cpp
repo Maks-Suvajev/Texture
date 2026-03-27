@@ -9,78 +9,10 @@ TextureManager::TextureManager(AssetRegistry* assetRegistry, QOpenGLExtraFunctio
     : ResourceManager<Texture>(assetRegistry, supportedTextureFileTypes),
       m_openGLFunctions(openGLFunctions)
 {
-    registerAllTextures();
+    refreshElements();
 }
 
-void TextureManager::registerAllTextures()
-{
-    for (const auto& texturePath : m_assetRegistry->getAllFilesOfType(m_activeDirectory, m_supportedFileTypes))
-    {
-        registerTexture(texturePath);
-    }
-}
-
-void TextureManager::refreshElements()
-{
-    std::vector<std::string> oldKeys = getKeys();
-    std::vector<std::string> newKeys;
-
-    for (const auto& texturePath : m_assetRegistry->getAllFilesOfType(m_activeDirectory, m_supportedFileTypes))
-    {
-        std::string name = texturePath.filename().string();
-
-        auto iter = std::find(oldKeys.begin(), oldKeys.end(), name);
-
-        if (iter == oldKeys.end())
-        {
-            registerTexture(texturePath);
-
-        }
-        else
-        {
-            oldKeys.erase(iter);
-        }
-    }
-
-    for (const auto& key : oldKeys)
-    {
-        // Keep old keys as long as the file still exists
-        if (!std::filesystem::exists(m_elements[key].get()->systemSourcePath))
-        {
-            #ifdef ENABLE_DEBUG_MESSAGES
-                std::cout << "ERROR::TextureManager::refreshTextures::Deleting key because it no longer exists: " << key << std::endl;
-            #endif
-
-            deleteElement(key);
-        };
-    }
-}
-
-void TextureManager::printAllTextures()
-{
-    std::cout << "----------------------------------------------------------------------------" << std::endl;
-
-    std::cout << "| ----- Printing currently available textures and their source paths ----- |" << std::endl;
-
-    for (const auto& [key, item] : m_elements)
-    {
-        std::cout << "----------------------------------------------------------------------------" << std::endl;
-        std::cout << "Key: " << key << std::endl;
-
-        if (item)
-        {
-            std::cout << "Path: " << item->systemSourcePath.string() << std::endl;
-        }
-        else
-        {
-            std::cout << "Path: NULLPTR" << std::endl;
-        }        
-    }
-
-    std::cout << "----------------------------------------------------------------------------" << std::endl << std::endl;
-}
-
-void TextureManager::registerTexture(const std::filesystem::path& texturePath)
+void TextureManager::registerElement(const std::filesystem::path& texturePath)
 {
     const auto key = std::filesystem::canonical(texturePath).generic_string();
 
@@ -98,7 +30,6 @@ void TextureManager::registerTexture(const std::filesystem::path& texturePath)
     textureData.name             = texturePath.filename().string();
     m_elements[key]              = std::make_unique<Texture>(textureData);     
 }
-
 
 void TextureManager::resetTexture(Texture* texture)
 {
@@ -183,7 +114,7 @@ void TextureManager::loadTexture(std::string key)
 
     // Set the texture filtering parameters
     m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_MIN_FILTER, texture->config.minFilter);
-    m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_MAG_FILTER, texture->config.minFilter);
+    m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_MAG_FILTER, texture->config.magFilter);
 
     // Load image into texture 1 using STB library
     int width, height, nrChannels;
@@ -202,6 +133,8 @@ void TextureManager::loadTexture(std::string key)
         #ifdef ENABLE_DEBUG_MESSAGES
             std::cout << "ERROR::TextureManager::loadTexture::stbi_load() returned invalid data!" << std::endl;
         #endif
+
+        return;
     }
 
     GLenum internalFormat; // GPU side format 8-bit vs 16-bit pixel precision. TODO: Not sure what I might use this for right now
@@ -268,7 +201,7 @@ GLuint TextureManager::getTextureID(std::string key)
         std::cout << "DEBUG::Key: " << key << " Texture ID Found: " << m_elements[key]->textureID << std::endl;
     #endif
 
-    return m_elements[key]->textureID;
+    return it->second->textureID;
 }
 
 

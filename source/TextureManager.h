@@ -28,16 +28,13 @@ class TextureManager : public ResourceManager<Texture>
     public:
         TextureManager(AssetRegistry* assetsManager, QOpenGLExtraFunctions* openGLFunctions );
 
-        void refreshElements() override;
-        void registerTexture(const std::filesystem::path& texturePath);
-        void registerAllTextures();
+        void registerElement(const std::filesystem::path& texturePath) override;
 
         void unloadTexture(std::string key);
         void loadTexture(std::string key);
         void resetTexture(Texture* texture);
 
         GLuint getTextureID(std::string key);
-        void printAllTextures();
 
     private:
         QOpenGLExtraFunctions* m_openGLFunctions;
