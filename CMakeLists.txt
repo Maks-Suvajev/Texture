@@ -2,6 +2,7 @@ add_library(TextureLib
     source/TextureManager.cpp
 )
 
+
 find_package(Qt6 REQUIRED COMPONENTS OpenGL)
 
 target_link_libraries(TextureLib 
@@ -9,7 +10,7 @@ target_link_libraries(TextureLib
         Qt6::OpenGL
         TypeLib
         AssetsLib
-        ResourceManagersLib
+        ResourceManagerBaseLib
 )
 
 target_include_directories(TextureLib 
