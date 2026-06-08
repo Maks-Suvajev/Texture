@@ -9,7 +9,42 @@ TextureManager::TextureManager(AssetRegistry* assetRegistry, QOpenGLExtraFunctio
     : ResourceManager<Texture>(assetRegistry, supportedTextureFileTypes),
       m_openGLFunctions(openGLFunctions)
 {
+    loadDefaultTextures();
     refreshElements();
+}
+
+void TextureManager::loadDefaultTextures()
+{
+    std::filesystem::path defaultTexturePath = std::filesystem::current_path() / defaultTextureDir;
+
+    std::filesystem::path diffuseFilePath = defaultTexturePath / defaultDiffuseFilename;
+    std::filesystem::path specularFilePath = defaultTexturePath / defaultSpecularFilename;
+
+    registerElement(diffuseFilePath);
+    registerElement(specularFilePath);
+
+    loadTexture(std::filesystem::canonical(diffuseFilePath).generic_string());
+    loadTexture(std::filesystem::canonical(specularFilePath).generic_string());
+}
+
+GLuint TextureManager::getDefaultTexture(const aiTextureType& type)
+{
+    std::filesystem::path defaultTexturePath = std::filesystem::current_path() / defaultTextureDir;
+
+    std::filesystem::path filePath;
+
+    switch(type)
+    {
+        case aiTextureType_DIFFUSE:
+            filePath = defaultTexturePath / defaultDiffuseFilename;
+            return getTextureID(std::filesystem::canonical(filePath).generic_string());
+
+        case aiTextureType_SPECULAR:
+            filePath = defaultTexturePath / defaultSpecularFilename;
+            return getTextureID(std::filesystem::canonical(filePath).generic_string());
+        default:
+            return 0;
+    }
 }
 
 void TextureManager::registerElement(const std::filesystem::path& texturePath)
@@ -19,7 +54,7 @@ void TextureManager::registerElement(const std::filesystem::path& texturePath)
     if (m_elements.contains(key))
     {
         #ifdef ENABLE_DEBUG_MESSAGES
-            std::cout << "ERROR::Texture already loaded with the key: " << texturePath.string() << std::endl;
+            std::cout << "WARNING::Texture already loaded with the key: " << texturePath.string() << std::endl;
         #endif
 
         return;
@@ -44,7 +79,7 @@ void TextureManager::resetTexture(Texture* texture)
 }
 
 
-void TextureManager::unloadTexture(std::string key)
+void TextureManager::unloadTexture(const std::string& key)
 {
     if (!m_elements.contains(key))
     {
@@ -69,7 +104,7 @@ void TextureManager::unloadTexture(std::string key)
     resetTexture(texture);
 }
 
-void TextureManager::loadTexture(std::string key)
+void TextureManager::loadTexture(const std::string& key)
 {
     if (!m_elements.contains(key))
     {
@@ -106,16 +141,16 @@ void TextureManager::loadTexture(std::string key)
     }
 
     m_openGLFunctions->glGenTextures(1, &texture->textureID);
-    m_openGLFunctions->glBindTexture(texture->config.textureType, texture->textureID);
+    m_openGLFunctions->glBindTexture(texture->config.textureTarget, texture->textureID);
 
     // Set the texture wrapping parameters
-    m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_WRAP_S, texture->config.wrapParam_S);
-    m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_WRAP_T, texture->config.wrapParam_T);
+    m_openGLFunctions->glTexParameteri(texture->config.textureTarget, GL_TEXTURE_WRAP_S, texture->config.wrapParam_S);
+    m_openGLFunctions->glTexParameteri(texture->config.textureTarget, GL_TEXTURE_WRAP_T, texture->config.wrapParam_T);
 
     // Set the texture filtering parameters
-    m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_MIN_FILTER, texture->config.minFilter);
-    m_openGLFunctions->glTexParameteri(texture->config.textureType, GL_TEXTURE_MAG_FILTER, texture->config.magFilter);
-
+    m_openGLFunctions->glTexParameteri(texture->config.textureTarget, GL_TEXTURE_MIN_FILTER, texture->config.minFilter);
+    m_openGLFunctions->glTexParameteri(texture->config.textureTarget, GL_TEXTURE_MAG_FILTER, texture->config.magFilter);
+ 
     // Load image into texture 1 using STB library
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(texture->config.flipOnLoad);
@@ -125,7 +160,6 @@ void TextureManager::loadTexture(std::string key)
     if (!data)
     {
         m_openGLFunctions->glDeleteTextures(1, &texture->textureID);
-        stbi_image_free(data);
 
         texture->isLoaded  = false;
         texture->loadError = true;
@@ -171,8 +205,8 @@ void TextureManager::loadTexture(std::string key)
         std::cout << "DEBUG::TextureManager::loadTexture::Number of channels detected = " << nrChannels << std::endl;
     #endif
 
-    m_openGLFunctions->glTexImage2D(texture->config.textureType, 0, internalFormat, width, height, 0, texture->textureFormat, GL_UNSIGNED_BYTE, data);
-    m_openGLFunctions->glGenerateMipmap(texture->config.textureType);
+    m_openGLFunctions->glTexImage2D(texture->config.textureTarget, 0, internalFormat, width, height, 0, texture->textureFormat, GL_UNSIGNED_BYTE, data);
+    m_openGLFunctions->glGenerateMipmap(texture->config.textureTarget);
 
     texture->width = width;
     texture->height = height;
@@ -183,7 +217,7 @@ void TextureManager::loadTexture(std::string key)
     stbi_image_free(data);
 }
 
-GLuint TextureManager::getTextureID(std::string key)
+GLuint TextureManager::getTextureID(const std::string& key)
 {
     auto it = m_elements.find(key);
 

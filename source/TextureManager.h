@@ -20,6 +20,8 @@
 
 #include "ResourceManager.h"
 
+#include <assimp/material.h>
+
 namespace gfx 
 {
 
@@ -30,14 +32,21 @@ class TextureManager : public ResourceManager<Texture>
 
         void registerElement(const std::filesystem::path& texturePath) override;
 
-        void unloadTexture(std::string key);
-        void loadTexture(std::string key);
+        void unloadTexture(const std::string& key);
+        void loadTexture(const std::string& key);
         void resetTexture(Texture* texture);
 
-        GLuint getTextureID(std::string key);
+        GLuint getTextureID(const std::string& key);
+
+        void loadDefaultTextures();
+        GLuint getDefaultTexture(const aiTextureType& type);
 
     private:
         QOpenGLExtraFunctions* m_openGLFunctions;
+
+        static constexpr const char* defaultTextureDir          = "defaults";
+        static constexpr const char* defaultDiffuseFilename     = "defaultDiffuse.png";
+        static constexpr const char* defaultSpecularFilename    = "defaultSpecular.png";
 };
 
 
