@@ -205,6 +205,7 @@ void TextureManager::loadTexture(const std::string& key)
         std::cout << "DEBUG::TextureManager::loadTexture::Number of channels detected = " << nrChannels << std::endl;
     #endif
 
+    m_openGLFunctions->glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // alignment can't be guaranteed given different texture formats
     m_openGLFunctions->glTexImage2D(texture->config.textureTarget, 0, internalFormat, width, height, 0, texture->textureFormat, GL_UNSIGNED_BYTE, data);
     m_openGLFunctions->glGenerateMipmap(texture->config.textureTarget);
 
